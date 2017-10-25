@@ -133,12 +133,23 @@ public class JellydocMojo extends AbstractMojo implements MavenReport {
         javadoc.setTaskName("jellydoc");
         javadoc.setProject(p);
 
+        boolean foundDir = false;
         for (Object dir : project.getCompileSourceRoots()) {
-            FileSet fs = new FileSet();
-            fs.setProject(p);
-            fs.setDir(new File(dir.toString()));
-            javadoc.addFileset(fs);
+            File dirFile = new File(dir.toString());
+            // For pom projects the dir might not exist
+            if (dirFile.exists()) {
+                FileSet fs = new FileSet();
+                fs.setProject(p);
+                fs.setDir(dirFile);
+                javadoc.addFileset(fs);
+                foundDir = true;
+            }
         }
+
+        if (!foundDir) {
+            return;
+        }
+
         javadoc.setClasspath(makePath(p,(Collection<Artifact>)project.getArtifacts()));
 
         Javadoc.DocletInfo d = javadoc.createDoclet();
@@ -221,8 +232,11 @@ public class JellydocMojo extends AbstractMojo implements MavenReport {
     public void generate(Sink sink, Locale locale) throws MavenReportException {
         try {
             execute();
-            new ReferenceRenderer(sink,new File(targetDir(),"taglib.xml").toURI().toURL()).render();
-            FileUtils.copyDirectory(targetDir(),new File(targetDir(),"site"),"taglib-*.xsd",null);
+            File libFile = new File(targetDir(), "taglib.xml");
+            if (libFile.exists()) {
+                new ReferenceRenderer(sink, libFile.toURI().toURL()).render();
+                FileUtils.copyDirectory(targetDir(), new File(targetDir(), "site"), "taglib-*.xsd", null);
+            }
         } catch (AbstractMojoExecutionException e) {
             throw new MavenReportException("Failed to generate report",e);
         } catch (MalformedURLException e) {
